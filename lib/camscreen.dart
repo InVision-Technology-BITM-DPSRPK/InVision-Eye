@@ -15,6 +15,7 @@ class CamScreen extends StatefulWidget {
 }
 
 class _CamScreenState extends State<CamScreen> {
+  final myController = TextEditingController();
   late List<CameraDescription> cameras = [];
   late CameraController _controller;
   late Timer _timer;
@@ -63,30 +64,57 @@ class _CamScreenState extends State<CamScreen> {
         'img.jpg',
       );
       await File(photo.path).copy(path);
+      final String temp = 'http://${myController.text}:5000/predict';
+      print("@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#$temp");
+      final String response = await sendImg(path, temp);
 
-      final String response = await sendImg(path);
-      //_speakText(clarifaiResponse.objects[0].data.concepts.name[0]);
-      final Map<String, dynamic> jsonData = jsonDecode(response);
-      List<String> objectTypes = List.from(jsonData['Objects']
-          .where((obj) => obj['Probabilty'] > 0.70)
-          .map((obj) => obj['Object_type'])
-          .cast<String>());
-      for (String objectType in objectTypes) {
-        _speakText(objectType);
+      print(response);
+
+      final Map<String, dynamic> jsonData = await jsonDecode(response);
+
+      if (jsonData.containsKey('Objects') && jsonData['Objects'] is List) {
+        List<String> objectTypes = [];
+
+        for (var obj in jsonData['Objects']) {
+          try {
+            if (obj is Map<String, dynamic> &&
+                obj.containsKey('Probabilty') &&
+                obj['Probabilty'] != null &&
+                obj['Probabilty'] is num &&
+                obj.containsKey('Object_type') &&
+                obj['Object_type'] != null &&
+                obj['Object_type'] is String &&
+                obj['Probabilty'] > 0.80) {
+              objectTypes.add(obj['Object_type']);
+            }
+          } catch (e) {
+            _speakText("Error in processing object: $e");
+          }
+        }
+
+        if (objectTypes.isEmpty) {
+          _speakText("No objects found");
+        } else {
+          for (String objectType in objectTypes) {
+            print(
+                "$objectType $objectType $objectType $objectType $objectType $objectType $objectType $objectType");
+            await _speakText("$objectType");
+          }
+        }
+      } else {
+        _speakText("No objects found");
       }
-
-      await File(path).delete();
-    } catch (e) {
+    } catch (e, stacktrace) {
       _speakText('Error taking photo: $e');
+      print(
+          '######################################################Stacktrace: $stacktrace');
     }
   }
 
-  Future<String> sendImg(String imgPath) async {
+  Future<String> sendImg(String imgPath, String apiUrl) async {
     try {
-      final apiUrl = 'http://122.163.105.89:5000/predict';
-
       var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
-      request.files.add(await http.MultipartFile.fromPath('image', imgPath));
+      request.files.add(await http.MultipartFile.fromPath('file', imgPath));
 
       var response = await request.send();
 
@@ -105,13 +133,15 @@ class _CamScreenState extends State<CamScreen> {
   }
 
   void _startAutoCapture() {
-    _timer = Timer.periodic(Duration(seconds: 3), (Timer timer) {
+    _timer =
+        Timer.periodic(Duration(seconds: 5, milliseconds: 500), (Timer timer) {
       _takeAndSavePhoto();
     });
   }
 
   Future<void> _speakText(String text) async {
     await flutterTts.speak(text);
+    await Future.delayed(const Duration(seconds: 1, milliseconds: 600));
   }
 
   @override
@@ -128,17 +158,53 @@ class _CamScreenState extends State<CamScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('InvisEye'),
-      ),
-      body: GestureDetector(
-        onTap: () {
-          _takeAndSavePhoto();
-        },
-        child: AspectRatio(
-          aspectRatio: _controller.value.aspectRatio,
-          child: CameraPreview(_controller),
+      backgroundColor: Colors.black,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(40.0),
+        child: AppBar(
+          backgroundColor: Colors.grey[800],
+          title: Text('InvisEye', style: TextStyle(fontSize: 16)),
+          centerTitle: true,
         ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      _takeAndSavePhoto();
+                    },
+                    child: AspectRatio(
+                      aspectRatio: _controller.value.aspectRatio,
+                      child: CameraPreview(_controller),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Enter IP Address',
+                labelStyle: TextStyle(color: Colors.white),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey[800]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey[800]!),
+                ),
+              ),
+              style: TextStyle(color: Colors.white),
+              controller: myController,
+            ),
+          ),
+        ],
       ),
     );
   }
