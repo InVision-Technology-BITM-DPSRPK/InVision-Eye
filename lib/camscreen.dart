@@ -84,7 +84,7 @@ class _CamScreenState extends State<CamScreen> {
                 obj.containsKey('Object_type') &&
                 obj['Object_type'] != null &&
                 obj['Object_type'] is String &&
-                obj['Probabilty'] > 0.80) {
+                obj['Probabilty'] > 0.45) {
               objectTypes.add(obj['Object_type']);
             }
           } catch (e) {
@@ -105,7 +105,7 @@ class _CamScreenState extends State<CamScreen> {
         _speakText("No objects found");
       }
     } catch (e, stacktrace) {
-      _speakText('Error taking photo: $e');
+      //_speakText('Error taking photo: $e');
       print(
           '######################################################Stacktrace: $stacktrace');
     }
@@ -126,22 +126,22 @@ class _CamScreenState extends State<CamScreen> {
         throw Exception('Image upload failed');
       }
     } catch (e) {
-      _speakText('Error uploading image: $e');
+      //_speakText('Error uploading image: $e');
 
       throw Exception('Image upload failed');
     }
-  }
+  } 
 
   void _startAutoCapture() {
     _timer =
-        Timer.periodic(Duration(seconds: 5, milliseconds: 500), (Timer timer) {
+        Timer.periodic(const Duration(seconds: 9), (Timer timer) {
       _takeAndSavePhoto();
     });
   }
 
   Future<void> _speakText(String text) async {
     await flutterTts.speak(text);
-    await Future.delayed(const Duration(seconds: 1, milliseconds: 600));
+    await Future.delayed(const Duration(seconds: 1, milliseconds: 700));
   }
 
   @override
@@ -170,8 +170,19 @@ class _CamScreenState extends State<CamScreen> {
       body: Column(
         children: [
           Expanded(
-            child: Row(
+            child: Column(
               children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      _takeAndSavePhoto();
+                    },
+                    child: AspectRatio(
+                      aspectRatio: _controller.value.aspectRatio,
+                      child: CameraPreview(_controller),
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
