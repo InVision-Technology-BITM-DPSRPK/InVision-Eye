@@ -63,13 +63,8 @@ class _CamScreenState extends State<CamScreen> {
       final String path = join(
         (await getTemporaryDirectory()).path,
         'img.jpg',
-      );
-      final String path2 = join(
-        (await getTemporaryDirectory()).path,
-        'img2.jpg',
-      );
-      await resizeImage(path);
-      await File(photo.path).copy(path2);
+      );0
+      await File(photo.path).copy(path);
       
       final String temp = 'http://${myController.text}:5000/predict';
       print("@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#$temp");
@@ -138,32 +133,7 @@ class _CamScreenState extends State<CamScreen> {
       throw Exception('Image upload failed');
     }
   } 
-Future<void> resizeImage(String imagePath) async {
-  try {
-    File imageFile = File(imagePath);
-    List<int> imageBytes = imageFile.readAsBytesSync();
-    img.Image? originalImage = img.decodeImage(Uint8List.fromList(imageBytes));
-    if (originalImage != null) {
-      final String resizedPath = join(
-        (await getTemporaryDirectory()).path,
-        'img2.jpg',
-      );
 
-      // Resize the image
-      img.Image resizedImage = img.copyResize(originalImage, width: 640, height: 640);
-
-      // Save the resized image
-      File(resizedPath).writeAsBytesSync(img.encodeJpg(resizedImage));
-
-      // Delete the original image
-      await imageFile.delete();
-    } else {
-      print('Error decoding image: Image is null');
-    }
-  } catch (e) {
-    print('Error resizing image: $e');
-  }
-}
 
   void _startAutoCapture() {
     _timer =
