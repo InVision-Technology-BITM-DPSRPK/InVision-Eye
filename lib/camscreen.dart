@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -8,7 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
-
+import 'package:image/image.dart' as img;
 class CamScreen extends StatefulWidget {
   @override
   _CamScreenState createState() => _CamScreenState();
@@ -63,7 +64,13 @@ class _CamScreenState extends State<CamScreen> {
         (await getTemporaryDirectory()).path,
         'img.jpg',
       );
-      await File(photo.path).copy(path);
+      final String path2 = join(
+        (await getTemporaryDirectory()).path,
+        'img2.jpg',
+      );
+      await resizeImage(path);
+      await File(photo.path).copy(path2);
+      
       final String temp = 'http://${myController.text}:5000/predict';
       print("@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#$temp");
       final String response = await sendImg(path, temp);
@@ -88,7 +95,7 @@ class _CamScreenState extends State<CamScreen> {
               objectTypes.add(obj['Object_type']);
             }
           } catch (e) {
-            _speakText("Error in processing object: $e");
+            //_speakText("Error in processing object: $e");
           }
         }
 
@@ -131,17 +138,43 @@ class _CamScreenState extends State<CamScreen> {
       throw Exception('Image upload failed');
     }
   } 
+Future<void> resizeImage(String imagePath) async {
+  try {
+    File imageFile = File(imagePath);
+    List<int> imageBytes = imageFile.readAsBytesSync();
+    img.Image? originalImage = img.decodeImage(Uint8List.fromList(imageBytes));
+    if (originalImage != null) {
+      final String resizedPath = join(
+        (await getTemporaryDirectory()).path,
+        'img2.jpg',
+      );
+
+      // Resize the image
+      img.Image resizedImage = img.copyResize(originalImage, width: 640, height: 640);
+
+      // Save the resized image
+      File(resizedPath).writeAsBytesSync(img.encodeJpg(resizedImage));
+
+      // Delete the original image
+      await imageFile.delete();
+    } else {
+      print('Error decoding image: Image is null');
+    }
+  } catch (e) {
+    print('Error resizing image: $e');
+  }
+}
 
   void _startAutoCapture() {
     _timer =
-        Timer.periodic(const Duration(seconds: 9), (Timer timer) {
+        Timer.periodic(const Duration(seconds: 6), (Timer timer) {
       _takeAndSavePhoto();
     });
   }
 
   Future<void> _speakText(String text) async {
     await flutterTts.speak(text);
-    await Future.delayed(const Duration(seconds: 1, milliseconds: 700));
+    await Future.delayed(const Duration(seconds: 1, milliseconds: 500));
   }
 
   @override
