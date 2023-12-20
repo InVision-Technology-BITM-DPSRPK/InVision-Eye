@@ -73,7 +73,7 @@ class _CamScreenState extends State<CamScreen> {
       
       final String temp = 'http://${myController.text}:5000/predict';
       print("@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#$temp");
-      final String response = await sendImg(path, temp);
+      final String response = await sendImg(path2, temp);
 
       print(response);
 
