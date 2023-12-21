@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image/image.dart' as img;
+
 class CamScreen extends StatefulWidget {
   @override
   _CamScreenState createState() => _CamScreenState();
@@ -21,7 +22,7 @@ class _CamScreenState extends State<CamScreen> {
   late CameraController _controller;
   late Timer _timer;
   FlutterTts flutterTts = FlutterTts();
-
+  late String direction;
   @override
   void initState() {
     super.initState();
@@ -63,44 +64,44 @@ class _CamScreenState extends State<CamScreen> {
       final String path = join(
         (await getTemporaryDirectory()).path,
         'img.jpg',
-      );0
-      await File(photo.path).copy(path);
-      
-      final String temp = 'http://${myController.text}:5000/predict';
-      print("@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#$temp");
-      final String response = await sendImg(path, temp);
+      );
+      final String path2 = join(
+        (await getTemporaryDirectory()).path,
+        'img2.jpg',
+      );
+      await resizeImage(path);
+      await File(photo.path).copy(path2);
 
-      print(response);
+      final String temp = 'http://${myController.text}:5000/predict';
+      final String response = await sendImg(path2, temp);
 
       final Map<String, dynamic> jsonData = await jsonDecode(response);
 
-      if (jsonData.containsKey('Objects') && jsonData['Objects'] is List) {
+      if (jsonData.containsKey('Num_objs') && jsonData['Num_objs'] is int) {
+        int numObjects = jsonData['Num_objs'];
         List<String> objectTypes = [];
 
-        for (var obj in jsonData['Objects']) {
+        for (var i = 0; i < numObjects; i++) {
           try {
+            var obj = jsonData['Objects'][i];
             if (obj is Map<String, dynamic> &&
-                obj.containsKey('Probabilty') &&
-                obj['Probabilty'] != null &&
-                obj['Probabilty'] is num &&
-                obj.containsKey('Object_type') &&
+                obj.containsKey('Coordinated') &&
+                obj['Coordinated'] is List &&
                 obj['Object_type'] != null &&
                 obj['Object_type'] is String &&
+                obj['Probabilty'] != null &&
+                obj['Probabilty'] is num &&
                 obj['Probabilty'] > 0.45) {
               objectTypes.add(obj['Object_type']);
+
+              List<double> coordinates =
+                  List.castFrom<dynamic, double>(obj['Coordinated']);
+
+              String direction = getGridLabel(coordinates, obj['Object_type']);
+              _speakText('$direction');
             }
           } catch (e) {
             //_speakText("Error in processing object: $e");
-          }
-        }
-
-        if (objectTypes.isEmpty) {
-          _speakText("No objects found");
-        } else {
-          for (String objectType in objectTypes) {
-            print(
-                "$objectType $objectType $objectType $objectType $objectType $objectType $objectType $objectType");
-            await _speakText("$objectType");
           }
         }
       } else {
@@ -111,6 +112,39 @@ class _CamScreenState extends State<CamScreen> {
       print(
           '######################################################Stacktrace: $stacktrace');
     }
+  }
+
+  String getGridLabel(List<double> coordinates, String objectType) {
+    double centerX = (coordinates[0] + coordinates[2]) / 2;
+    double centerY = (coordinates[1] + coordinates[3]) / 2;
+
+    // Calculate grid position
+    double gridWidth = _controller.value.previewSize!.width / 3;
+    double gridHeight = _controller.value.previewSize!.height / 3;
+
+    int col = (centerX / gridWidth).floor();
+    int row = (centerY / gridHeight).floor();
+
+    // Label the grid with direction and object type
+    String direction = '';
+
+    if (row == 0) {
+      direction += 'Top';
+    } else if (row == 1) {
+      direction += 'Middle';
+    } else {
+      direction += 'Bottom';
+    }
+
+    if (col == 0) {
+      direction += ' Left';
+    } else if (col == 1) {
+      direction += ' Center';
+    } else {
+      direction += ' Right';
+    }
+
+    return '$objectType at $direction';
   }
 
   Future<String> sendImg(String imgPath, String apiUrl) async {
@@ -132,19 +166,46 @@ class _CamScreenState extends State<CamScreen> {
 
       throw Exception('Image upload failed');
     }
-  } 
+  }
 
+  Future<void> resizeImage(String imagePath) async {
+    try {
+      File imageFile = File(imagePath);
+      List<int> imageBytes = imageFile.readAsBytesSync();
+      img.Image? originalImage =
+          img.decodeImage(Uint8List.fromList(imageBytes));
+      if (originalImage != null) {
+        final String resizedPath = join(
+          (await getTemporaryDirectory()).path,
+          'img2.jpg',
+        );
+
+        // Resize the image
+        img.Image resizedImage =
+            img.copyResize(originalImage, width: 640, height: 640);
+
+        // Save the resized image
+        File(resizedPath).writeAsBytesSync(img.encodeJpg(resizedImage));
+
+        // Delete the original image
+        await imageFile.delete();
+      } else {
+        print('Error decoding image: Image is null');
+      }
+    } catch (e) {
+      print('Error resizing image: $e');
+    }
+  }
 
   void _startAutoCapture() {
-    _timer =
-        Timer.periodic(const Duration(seconds: 6), (Timer timer) {
+    _timer = Timer.periodic(const Duration(seconds: 8), (Timer timer) {
       _takeAndSavePhoto();
     });
   }
 
   Future<void> _speakText(String text) async {
     await flutterTts.speak(text);
-    await Future.delayed(const Duration(seconds: 1, milliseconds: 500));
+    await Future.delayed(const Duration(seconds: 2, milliseconds: 500));
   }
 
   @override
