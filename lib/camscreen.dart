@@ -21,8 +21,9 @@ class _CamScreenState extends State<CamScreen> {
   late List<CameraDescription> cameras = [];
   late CameraController _controller;
   late Timer _timer;
-  FlutterTts flutterTts = FlutterTts();
-  late String direction;
+  bool flag = true;
+  late FlutterTts flutterTts;
+  String Speech_temp = "Invision 360 Started0";
   @override
   void initState() {
     super.initState();
@@ -48,10 +49,14 @@ class _CamScreenState extends State<CamScreen> {
     }
   }
 
-  Future<void> _configureTts() async {
+  _configureTts() async {
+    flutterTts = FlutterTts();
     await flutterTts.setLanguage('en-US');
     await flutterTts.setPitch(1.0);
     await flutterTts.setVolume(1.0);
+    await flutterTts.awaitSpeakCompletion(true);
+    flutterTts.setCompletionHandler(() {});
+    
   }
 
   Future<void> _takeAndSavePhoto() async {
@@ -80,7 +85,9 @@ class _CamScreenState extends State<CamScreen> {
       if (jsonData.containsKey('Num_objs') && jsonData['Num_objs'] is int) {
         int numObjects = jsonData['Num_objs'];
         List<String> objectTypes = [];
-
+        setState(() {
+          flag = false;
+        });
         for (var i = 0; i < numObjects; i++) {
           try {
             var obj = jsonData['Objects'][i];
@@ -104,6 +111,9 @@ class _CamScreenState extends State<CamScreen> {
             //_speakText("Error in processing object: $e");
           }
         }
+        setState(() {
+          flag = true;
+        });
       } else {
         _speakText("No objects found");
       }
@@ -180,14 +190,14 @@ class _CamScreenState extends State<CamScreen> {
           'img2.jpg',
         );
 
-        // Resize the image
+        
         img.Image resizedImage =
             img.copyResize(originalImage, width: 640, height: 640);
 
-        // Save the resized image
+        
         File(resizedPath).writeAsBytesSync(img.encodeJpg(resizedImage));
 
-        // Delete the original image
+        
         await imageFile.delete();
       } else {
         print('Error decoding image: Image is null');
@@ -198,14 +208,24 @@ class _CamScreenState extends State<CamScreen> {
   }
 
   void _startAutoCapture() {
-    _timer = Timer.periodic(const Duration(seconds: 8), (Timer timer) {
-      _takeAndSavePhoto();
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
+      if (flag ==true){
+        _takeAndSavePhoto();
+        setState(() {
+          flag=false;
+        });
+      }
+      
     });
   }
 
   Future<void> _speakText(String text) async {
-    await flutterTts.speak(text);
-    await Future.delayed(const Duration(seconds: 2, milliseconds: 500));
+    setState(() {
+      Speech_temp = text;
+      
+    });
+    await flutterTts.speak(Speech_temp);
+    await Future.delayed(const Duration(seconds: 1, milliseconds: 800));
   }
 
   @override
